@@ -1,12 +1,53 @@
+import torch
+from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import open3d as o3d
 from pathlib import Path
 
-DATASET_PATH = "./data/ModelNet40/"
-DATASET_PROCESSED_PATH = "./data/out/"
-VOXEL_SIZE = 0.02
+modelnet40_label_to_idx = {
+    "airplane": 0,
+    "bathtub": 1,
+    "bed": 2,
+    "bench": 3,
+    "bookshelf": 4,
+    "bottle": 5,
+    "bowl": 6,
+    "car": 7,
+    "chair": 8,
+    "cone": 9,
+    "cup": 10,
+    "curtain": 11,
+    "desk": 12,
+    "door": 13,
+    "dresser": 14,
+    "flower_pot": 15,
+    "glass_box": 16,
+    "guitar": 17,
+    "keyboard": 18,
+    "lamp": 19,
+    "laptop": 20,
+    "mantel": 21,
+    "monitor": 22,
+    "night_stand": 23,
+    "person": 24,
+    "piano": 25,
+    "plant": 26,
+    "radio": 27,
+    "range_hood": 28,
+    "sink": 29,
+    "sofa": 30,
+    "stairs": 31,
+    "stool": 32,
+    "table": 33,
+    "tent": 34,
+    "toilet": 35,
+    "tv_stand": 36,
+    "vase": 37,
+    "wardrobe": 38,
+    "xbox": 39
+}
 
 # the open3d mesh loader can't parse OFF if it starts with "OFF1234" etc.
 # move the integers one line below
@@ -150,8 +191,54 @@ def process_meshes(meshes_dir, output_dir, voxel_size):
     print(f"MODEL GRID SHAPE: {model_grid_shape}")
     print("#########################################################")
 
+def get_label_id(label_str):
+    return modelnet40_label_to_idx[label_str]
+
+def get_label_str(filename):
+    l = filename.split("_")
+    s = ""
+    for i in range(len(l) - 1):
+        s = s + l[i]
+        if i != len(l) - 2: s = s + "_"
+    return s
+
+def label_id_to_np(label_id):
+    t = np.zeros(len(modelnet40_label_to_idx))
+    t[label_id] = 1
+    return t
+
+# type either "train" or "test"
+class VGDataset(Dataset):
+
+    def __init__(self, dataset_path, type: str):
+        self.data = []
+        self.labels = []
+        self.label_set = {}
+        self.path = dataset_path
+
+        for root, _, files in os.walk(self.path):
+            for file in files:
+                if not file.endswith(".npy"): continue
+
+                parent_dir_name = os.path.basename(root)
+                if parent_dir_name != type: continue
+
+                d = torch.from_numpy(np.load(os.path.join(root, file), allow_pickle=True)).float()
+                self.data.append(d)
+                self.labels.append(torch.from_numpy(label_id_to_np(get_label_id(get_label_str(file)))))
+
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
 
 if __name__ == "__main__":
     # process_meshes("./data/dummy/", "./data/dummy/out/", VOXEL_SIZE)
+    DATASET_PATH = "./data/ModelNet40/"
+    DATASET_PROCESSED_PATH = "./data/out/"
+    VOXEL_SIZE = 0.02
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE)
     # fix_off_files(DATASET_PATH)
