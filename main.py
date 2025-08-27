@@ -121,10 +121,10 @@ def main():
         model, losses_train, losses_test = load_model()
 
     model.to(device)
+    print(f"model moved to device: {device} - {torch.cuda.get_device_name(torch.cuda.device)}")
 
     # train (and test during training)
     if args_train_model:
-        print(f"model moved to device {device}")
         epochs = NR_EPOCHS
         for epoch in range(epochs):
             print(f"epoch {epoch}")
@@ -162,7 +162,7 @@ def main():
         "model_state_dict": model.state_dict(),
         "losses_train": losses_train,
         "losses_test": losses_test,
-    }, OUTPUT_DIR + save_filename)
+    }, OUTPUT_DIR + save_filename + ".pth")
     print("Model saved.")
 
     if args_train_model:
