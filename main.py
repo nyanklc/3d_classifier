@@ -55,11 +55,6 @@ def test_model(model, test_dataloader, loss_criterion, losses_test, device):
     return losses_test
 
 
-
-
-args_load_model = False
-args_train_model = False
-args_test_model = False
 def main():
     print("DON'T PUT INVALID INPUTS, THERE ARE NO CHECKS")
     print("-----------------------------------------------")
@@ -72,6 +67,9 @@ def main():
     print("5. Load an existing model and only test.")
 
     args_in = input("> Select: ")
+    args_load_model = False
+    args_train_model = False
+    args_test_model = False
     match args_in:
         case "1":
             args_train_model = True
@@ -168,8 +166,9 @@ def main():
     if args_train_model:
         # plot
         plt.figure(figsize=(10,5))
-        if args_train_model: plt.plot(losses_train, label="Training Loss")
-        if args_test_model: plt.plot(losses_test, label="Test Loss")
+        if args_train_model:
+            plt.plot(losses_train, label="Training Loss")
+            plt.plot(losses_test, label="Test Loss")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.legend()
