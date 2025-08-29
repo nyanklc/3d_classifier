@@ -131,6 +131,37 @@ def get_model_grid_shape(meshes_dir, voxel_size):
 
     return model_grid_shape
 
+def convert_mesh(mesh_filepath, voxel_size, model_grid_shape):
+    mesh = o3d.io.read_triangle_mesh(mesh_filepath)
+    mesh.compute_vertex_normals()
+
+    mesh.scale(1 / np.max(mesh.get_max_bound() - mesh.get_min_bound()), center=mesh.get_center())
+
+    voxel_grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(mesh, voxel_size=voxel_size)
+
+    voxels = np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
+    # print(f"voxels: {voxels}")
+    # print(f"number of voxels: {len(voxels)}")
+
+    # # Normalize indices to start at (0,0,0)
+    # min_idx_0 = min(x[0] for x in voxels)
+    # min_idx_1 = min(x[1] for x in voxels)
+    # min_idx_2 = min(x[2] for x in voxels)
+    # voxels = np.subtract(voxels, (min_idx_0, min_idx_1, min_idx_2))
+
+    max_idx_0 = max(x[0] for x in voxels)
+    max_idx_1 = max(x[1] for x in voxels)
+    max_idx_2 = max(x[2] for x in voxels)
+    grid_shape = (max_idx_0 + 1, max_idx_1 + 1, max_idx_2 + 1)
+    # print(f"grid_shape: {grid_shape} (model grid shape: {model_grid_shape})")
+
+    # model grid will be our input to the model, it has a fixed shape
+    model_grid = np.zeros(model_grid_shape)
+    for v in voxels:
+        model_grid[v[0], v[1], v[2]] = 1
+
+    return model_grid
+
 def process_meshes(meshes_dir, output_dir, voxel_size):
 
     model_grid_shape = get_model_grid_shape(meshes_dir, voxel_size)
@@ -152,33 +183,7 @@ def process_meshes(meshes_dir, output_dir, voxel_size):
                 print(f"File {os.path.join(output_dir + out_out_dir, f"{out_filename}.npy")} already exists, skipping")
                 continue
 
-            mesh = o3d.io.read_triangle_mesh(os.path.join(root, file))
-            mesh.compute_vertex_normals()
-
-            mesh.scale(1 / np.max(mesh.get_max_bound() - mesh.get_min_bound()), center=mesh.get_center())
-
-            voxel_grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(mesh, voxel_size=voxel_size)
-
-            voxels = np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
-            print(f"voxels: {voxels}")
-            print(f"number of voxels: {len(voxels)}")
-
-            # # Normalize indices to start at (0,0,0)
-            # min_idx_0 = min(x[0] for x in voxels)
-            # min_idx_1 = min(x[1] for x in voxels)
-            # min_idx_2 = min(x[2] for x in voxels)
-            # voxels = np.subtract(voxels, (min_idx_0, min_idx_1, min_idx_2))
-
-            max_idx_0 = max(x[0] for x in voxels)
-            max_idx_1 = max(x[1] for x in voxels)
-            max_idx_2 = max(x[2] for x in voxels)
-            grid_shape = (max_idx_0 + 1, max_idx_1 + 1, max_idx_2 + 1)
-            print(f"grid_shape: {grid_shape} (model grid shape: {model_grid_shape})")
-
-            # model grid will be our input to the model, it has a fixed shape
-            model_grid = np.zeros(model_grid_shape)
-            for v in voxels:
-                model_grid[v[0], v[1], v[2]] = 1
+            model_grid = convert_mesh(os.path.join(root, file), voxel_size, model_grid_shape)
 
             # plot_voxel_grid(model_grid)
 
