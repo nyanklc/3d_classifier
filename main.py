@@ -306,7 +306,7 @@ def main():
     if not args_load_model:
         print("a new model created")
     else:
-        model, losses_train, losses_test, accuracies_train, accuracies_test = load_model()
+        model, losses_train, losses_test, accuracies_train, accuracies_test, _ = load_model()
 
     model.to(device)
     print(f"model moved to device: {device} - {torch.cuda.get_device_name(torch.cuda.device)}")
