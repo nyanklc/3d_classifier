@@ -5,6 +5,10 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+<<<<<<< Updated upstream
+=======
+from tqdm import tqdm
+>>>>>>> Stashed changes
 
 from data import VGDataset
 from model import Classifier3D
@@ -24,7 +28,11 @@ def plot(losses_train, losses_test, accuracies_train, accuracies_test):
     plt.figure(figsize=(10,5))
     plt.plot(losses_train, label="Training Loss")
     plt.plot(losses_test, label="Test Loss")
+<<<<<<< Updated upstream
     plt.xlabel("Epoch")
+=======
+    plt.xlabel("Batch")
+>>>>>>> Stashed changes
     plt.ylabel("Loss")
     plt.legend()
     plt.title("Training/Testing Loss")
@@ -43,6 +51,10 @@ def plot(losses_train, losses_test, accuracies_train, accuracies_test):
     plt.show()
 
 def load_model():
+<<<<<<< Updated upstream
+=======
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     load_filename = input("> Load model from (full or relative path to file) (defaults to ./out/out.pth): ")
     if load_filename == "":
         load_filename = "./out/out.pth"
@@ -87,9 +99,9 @@ def test_model(model, test_dataloader, loss_criterion, losses_test, accuracies_t
             total += label.size(0)
         accuracy = correct / total
 
-    losses_test.append(np.mean(losses_test_e))
+    losses_test.extend(losses_test_e)
     accuracies_test.append(accuracy)
-    print(f"test avg loss: {losses_test[-1]} (accuracy: {accuracies_test[-1]})")
+    print(f"test avg loss: {np.mean(losses_test_e)} (accuracy: {accuracies_test[-1]})")
     return losses_test, accuracies_test, correct, total
 
 # on CPU
@@ -101,11 +113,19 @@ def demo_model():
 
     model, losses_train, losses_test, accuracies_train, accuracies_test, _ = load_model()
 
+<<<<<<< Updated upstream
+=======
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     yes = input("> Plot training results? (y/n) (default: n)")
     if yes == "": yes = "n"
     if yes == "y":
         plot(losses_train, losses_test, accuracies_train, accuracies_test)
 
+<<<<<<< Updated upstream
+=======
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     demo_input_file = input("> Enter path to mesh (or voxel grid npy) to predict: ").strip('"')
     inp = None
     if demo_input_file.endswith(".off"):
@@ -148,6 +168,10 @@ def benchmark():
 
     model, losses_train, losses_test, accuracies_train, accuracies_test, model_filename = load_model()
 
+<<<<<<< Updated upstream
+=======
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     yes = input("> Plot training results? (y/n) (default: n)")
     if yes == "": yes = "n"
     if yes == "y":
@@ -224,6 +248,10 @@ def benchmark():
         "model_filename": model_filename
     }
 
+<<<<<<< Updated upstream
+=======
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     dump_filename = input("> Enter filename for csv output (without extension): ")
     df.to_csv(OUTPUT_DIR + dump_filename + ".csv", index=False)
     print(f"Benchmark results saved to {OUTPUT_DIR + dump_filename + ".csv"}")
@@ -274,9 +302,17 @@ def main():
             print("??")
             exit()
 
+<<<<<<< Updated upstream
     BATCH_SIZE = int(input("> enter batch size: "))
     NR_EPOCHS = 0
     if args_train_model:
+=======
+    dummy = input("dummy (press enter)")
+    BATCH_SIZE = int(input("> enter batch size: "))
+    NR_EPOCHS = 0
+    if args_train_model:
+        dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
         NR_EPOCHS = int(input("> enter nr epochs: "))
 
 
@@ -315,7 +351,10 @@ def main():
     if args_train_model:
         epochs = NR_EPOCHS
         for epoch in range(epochs):
+<<<<<<< Updated upstream
             print(f"epoch {epoch}")
+=======
+>>>>>>> Stashed changes
             correct = 0
             total = 0
 
@@ -324,7 +363,11 @@ def main():
 
             losses_train_e = []
             model.train()
+<<<<<<< Updated upstream
             for inp, label in train_dataloader:
+=======
+            for inp, label in tqdm(train_dataloader, desc=f"epoch {epoch+1}/{epochs}"):
+>>>>>>> Stashed changes
                 inp = inp.to(device)
                 label = label.to(device)
 
@@ -347,9 +390,15 @@ def main():
                 overall_total += total
             accuracy = correct / total
 
+<<<<<<< Updated upstream
             losses_train.append(np.mean(losses_train_e))
             accuracies_train.append(accuracy)
             print(f"training avg loss: {losses_train[-1]} (accuracy: {accuracies_train[-1]})")
+=======
+            losses_train.extend(losses_train_e)
+            accuracies_train.append(accuracy)
+            print(f"training avg loss: {np.mean(losses_train_e)} (accuracy: {accuracies_train[-1]})")
+>>>>>>> Stashed changes
             losses_test, accuracies_test, test_correct, test_total = test_model(model, test_dataloader, loss_criterion, losses_test, accuracies_test, device)
 
             overall_correct += test_correct
@@ -359,6 +408,7 @@ def main():
             print(f"accuracy over the whole dataset: {overall_accuracy}")
 
 
+<<<<<<< Updated upstream
     # test
     if args_test_model:
         nr_test = int(input("> nr of times to test: "))
@@ -372,6 +422,12 @@ def main():
     # save
     if args_train_model:
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+=======
+    # save
+    if args_train_model:
+        Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+        dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
         save_filename = input("> Save the file to (just the file name, without extension): ")
         torch.save({
             "model_state_dict": model.state_dict(),
@@ -382,6 +438,22 @@ def main():
         }, OUTPUT_DIR + save_filename + ".pth")
         print("Model saved.")
 
+<<<<<<< Updated upstream
+=======
+    # test
+    if args_test_model:
+        dummy = input("dummy (press enter)")
+        nr_test = int(input("> nr of times to test: "))
+        losses = []
+        accuracies = []
+        if nr_test > 0:
+            for _ in range(nr_test):
+                losses, accuracies, _, _ = test_model(model, test_dataloader, loss_criterion, losses, accuracies, device)
+        print(f"Average test loss: {np.mean(losses)}")
+        print(f"Average test accuracy: {np.mean(accuracies)}")
+
+    dummy = input("dummy (press enter)")
+>>>>>>> Stashed changes
     yes = input("> Plot results? (y/n)")
     if yes == "y":
         plot(losses_train, losses_test, accuracies_train, accuracies_test)

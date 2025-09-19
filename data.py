@@ -242,8 +242,10 @@ class VGDataset(Dataset):
 
 if __name__ == "__main__":
     # process_meshes("./data/dummy/", "./data/dummy/out/", VOXEL_SIZE)
+
     DATASET_PATH = "./data/ModelNet40/"
     DATASET_PROCESSED_PATH = "./data/out/"
     VOXEL_SIZE = 0.02
+
+    fix_off_files(DATASET_PATH)
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE)
-    # fix_off_files(DATASET_PATH)
