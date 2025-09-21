@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from data import VGDataset
+from data import VGDataset, plot_voxel_grid
 from model import Classifier3D
 
 # DATASET_PATH = "./data/ModelNet40/"
@@ -247,6 +247,7 @@ def main():
     print("5. Load an existing model and only test.")
     print("6. Demo existing model.")
     print("7. Test existing model over the whole dataset.")
+    print("8. Plot a voxel grid.")
 
     args_in = input("> Select (default: 6): ")
     if args_in == "": args_in = "6"
@@ -275,6 +276,36 @@ def main():
             exit()
         case "7":
             benchmark()
+            exit()
+        case "8":
+            dummy = input("dummy (press enter)")
+            global DATASET_PROCESSED_PATH
+            train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train")
+            test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
+            train_dataloader = DataLoader(train_dataset, 1, shuffle=True)
+            test_dataloader = DataLoader(test_dataset, 1, shuffle=True)
+
+            count = 0
+            for inp, label in train_dataloader:
+                if torch.sum(inp) < 300:
+                    count += 1
+                    print(label[1])
+                    print(torch.sum(inp))
+                    plot_voxel_grid(inp[0,:].numpy()) # uncomment the filenames thing in the dataset for these
+            print(f"train count: {count}")
+
+            count = 0
+            for inp, label in test_dataloader:
+                if torch.sum(inp) < 300:
+                    count += 1
+                    print(label[1])
+                    print(torch.sum(inp))
+                    plot_voxel_grid(inp[0,:].numpy())
+            print(f"test count: {count}")
+
+            # vg_filepath = input("> enter voxel grid filepath: ")
+            # vg = np.load(vg_filepath, allow_pickle=True)
+            # plot_voxel_grid(vg)
             exit()
         case _:
             print("??")

@@ -218,6 +218,7 @@ class VGDataset(Dataset):
     def __init__(self, dataset_path, type: str):
         self.data = []
         self.labels = []
+        self.filenames = []
         self.label_set = {}
         self.path = dataset_path
 
@@ -228,6 +229,7 @@ class VGDataset(Dataset):
                 parent_dir_name = os.path.basename(root)
                 if parent_dir_name != type: continue
 
+                self.filenames.append(os.path.join(root, file))
                 d = torch.from_numpy(np.load(os.path.join(root, file), allow_pickle=True)).float()
                 self.data.append(d)
                 self.labels.append(torch.from_numpy(label_id_to_np(get_label_id(get_label_str(file)))))
@@ -237,7 +239,7 @@ class VGDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx], self.labels[idx]
+        return self.data[idx], self.labels[idx] #[self.labels[idx], self.filenames[idx]]
 
 
 if __name__ == "__main__":
