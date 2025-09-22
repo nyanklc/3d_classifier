@@ -241,6 +241,9 @@ class VGDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx] #[self.labels[idx], self.filenames[idx]]
 
+    def get_filename(self, idx):
+        return self.filenames[idx]
+
 
 if __name__ == "__main__":
     # process_meshes("./data/dummy/", "./data/dummy/out/", VOXEL_SIZE)

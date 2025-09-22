@@ -247,7 +247,7 @@ def main():
     print("5. Load an existing model and only test.")
     print("6. Demo existing model.")
     print("7. Test existing model over the whole dataset.")
-    print("8. Plot a voxel grid.")
+    print("8. Plot small scale voxel grids.")
 
     args_in = input("> Select (default: 6): ")
     if args_in == "": args_in = "6"
@@ -282,25 +282,27 @@ def main():
             global DATASET_PROCESSED_PATH
             train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train")
             test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
-            train_dataloader = DataLoader(train_dataset, 1, shuffle=True)
-            test_dataloader = DataLoader(test_dataset, 1, shuffle=True)
+            # train_dataloader = DataLoader(train_dataset, 1, shuffle=True)
+            # test_dataloader = DataLoader(test_dataset, 1, shuffle=True)
 
             count = 0
-            for inp, label in train_dataloader:
+            for i in range(len(train_dataset)):
+                inp, label = train_dataset[i]
                 if torch.sum(inp) < 300:
                     count += 1
-                    print(label[1])
+                    print(train_dataset.get_filename(i))
                     print(torch.sum(inp))
-                    plot_voxel_grid(inp[0,:].numpy()) # uncomment the filenames thing in the dataset for these
+                    plot_voxel_grid(inp.numpy()) # uncomment the filenames thing in the dataset for these
             print(f"train count: {count}")
 
             count = 0
-            for inp, label in test_dataloader:
+            for i in range(len(test_dataset)):
+                inp, label = test_dataset[i]
                 if torch.sum(inp) < 300:
                     count += 1
-                    print(label[1])
+                    print(train_dataset.get_filename(i))
                     print(torch.sum(inp))
-                    plot_voxel_grid(inp[0,:].numpy())
+                    plot_voxel_grid(inp.numpy())
             print(f"test count: {count}")
 
             # vg_filepath = input("> enter voxel grid filepath: ")
