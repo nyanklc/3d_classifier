@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from data import VGDataset, plot_voxel_grid, find_small_scale_vgs
+from data import VGDataset, plot_voxel_grid, find_small_scale_vgs, get_label_str
 from model import Classifier3D
 
 # DATASET_PATH = "./data/ModelNet40/"
@@ -18,28 +18,31 @@ MODEL_GRID_SHAPE_FILE = DATASET_PROCESSED_PATH + "model_grid_shape.txt"
 BATCH_SIZE = 64
 NR_EPOCHS = 30
 
+VALIDATION_PERCENTAGE = 0.2
+
 OUTPUT_DIR = "./out/"
 
-def plot(losses_train, losses_test, accuracies_train, accuracies_test):
+def plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test):
     # loss
     plt.figure(figsize=(10,5))
     plt.plot(losses_train, label="Training Loss")
-    plt.plot(losses_test, label="Test Loss")
+    plt.plot(losses_val, label="Validation Loss")
     plt.xlabel("Batch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.title("Training/Testing Loss")
+    plt.title("Training/Validation/Test Loss")
     plt.grid()
     plt.show()
 
     # accuracy
     plt.figure(figsize=(10,5))
     plt.plot(accuracies_train, label="Training Accuracy")
-    plt.plot(accuracies_test, label="Test Accuracy")
+    plt.plot(accuracies_val, label="Validation Accuracy")
+    plt.title(f"Test Accuracy {accuracy_test[-1]}")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.title("Training/Testing Accuracy")
+    plt.title("Training/Validation/Test Accuracy")
     plt.grid()
     plt.show()
 
@@ -57,29 +60,28 @@ def load_model():
     model = Classifier3D()
     model.load_state_dict(checkpoint["model_state_dict"])
     losses_train = checkpoint["losses_train"]
-    losses_test = checkpoint["losses_test"]
+    losses_val = checkpoint["losses_val"]
     accuracies_train = checkpoint["accuracies_train"]
-    accuracies_test = checkpoint["accuracies_test"]
+    accuracies_val = checkpoint["accuracies_val"]
+    accuracy_test = checkpoint["accuracy_test"]
 
-    return model, losses_train, losses_test, accuracies_train, accuracies_test, load_filename
+    return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename
 
-# TODO: i think python takes arrays as reference, so no need to return (may be causing extra copy operations idk)
-def test_model(model, test_dataloader, loss_criterion, losses_test, accuracies_test, device):
-    losses_test_e = []
+# TODO: i think python takes arrays as reference, so no need to return (may be causing extra copy operations idk).
+def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, device, name="test"):
     accuracy = 0
-
     correct = 0
     total = 0
+    losses_e = []
     with torch.no_grad():
         model.eval()
-        for inp, label in test_dataloader:
+        for inp, label in dataloader:
             inp = inp.to(device)
             label = label.to(device)
 
             out = model(inp)
-
             loss = loss_criterion(out, label)
-            losses_test_e.append(loss.item())
+            losses_e.append(loss.item())
 
             preds = torch.zeros_like(out)
             preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
@@ -88,11 +90,14 @@ def test_model(model, test_dataloader, loss_criterion, losses_test, accuracies_t
             correct += (pred_classes == true_classes).sum().item()
             total += label.size(0)
         accuracy = correct / total
+        model.train()
 
-    losses_test.extend(losses_test_e)
-    accuracies_test.append(accuracy)
-    print(f"test avg loss: {np.mean(losses_test_e)} (accuracy: {accuracies_test[-1]})")
-    return losses_test, accuracies_test, correct, total
+    if losses is not None:
+        losses.extend(losses_e)
+    accuracies.append(accuracy)
+
+    print(f"{name} avg loss: {np.mean(losses_e)} (accuracy: {accuracies[-1]})")
+    return losses, accuracies
 
 # on CPU
 def demo_model():
@@ -101,13 +106,13 @@ def demo_model():
     from data import convert_mesh
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_test, accuracies_train, accuracies_test, _ = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _ = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
     if yes == "": yes = "n"
     if yes == "y":
-        plot(losses_train, losses_test, accuracies_train, accuracies_test)
+        plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test)
 
     dummy = input("dummy (press enter)")
     demo_input_file = input("> Enter path to mesh (or voxel grid npy) to predict: ").strip('"')
@@ -150,13 +155,13 @@ def benchmark():
     from data import get_label_str, get_label_id, label_id_to_np
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_test, accuracies_train, accuracies_test, model_filename = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, model_filename = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
     if yes == "": yes = "n"
     if yes == "y":
-        plot(losses_train, losses_test, accuracies_train, accuracies_test)
+        plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test)
 
     import pandas as pd
 
@@ -235,16 +240,22 @@ def benchmark():
     print(f"Benchmark results saved to {OUTPUT_DIR + dump_filename + ".csv"}")
 
 
+def get_group(fname):
+    # nr_before_number = len(get_label_str(fname).split())
+    # return "_".join(...)
+    # TODO
+    return None
+
 def main():
     print("DON'T ENTER INVALID INPUTS, THERE ARE NO SANITY CHECKS")
     print("-----------------------------------------------")
 
     print("Modes:")
-    print("1. Create a new model and train (tests during training).") # TODO: is testing after train really necessary? already tests during training anyway lol
-    print("2. Load an existing model and train (tests during training).")
-    print("3. Create a new model and only train (tests during training).")
-    print("4. Load an existing model and only train (tests during training).")
-    print("5. Load an existing model and only test.")
+    print("1. Create a new model and train+test.") # TODO: is testing after train really necessary? already tests during training anyway lol
+    print("2. Load an existing model and train+test.")
+    print("3. Create a new model and train.")
+    print("4. Load an existing model and train.")
+    print("5. Load an existing model and test.")
     print("6. Demo existing model.")
     print("7. Test existing model over the whole dataset.")
     print("8. Find small scale voxel grids.")
@@ -322,41 +333,44 @@ def main():
     # dataset
     print("loading train/test datasets...")
     train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train")
+    train_split_len = int(len(train_dataset)*(1-VALIDATION_PERCENTAGE))
+    train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_split_len, len(train_dataset)-train_split_len])
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
     train_dataloader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, BATCH_SIZE, shuffle=True)
     test_dataloader = DataLoader(test_dataset, BATCH_SIZE, shuffle=True)
-    print(f"train and test datasets loaded, lenghts: {len(train_dataset)}, {len(test_dataset)}")
+    print(f"train, val, and test datasets loaded, lenghts: {len(train_dataset)}, {len(val_dataset)}, {len(test_dataset)}")
 
     # definitions
     model = Classifier3D()
     opt = optim.Adam(model.parameters(), lr=1e-4)#, weight_decay=6e-3)
     loss_criterion = nn.CrossEntropyLoss()
     losses_train = []
-    losses_test = []
+    losses_val = []
     accuracies_train = []
-    accuracies_test = []
+    accuracies_val = []
+    accuracy_test = []
 
     if not args_load_model:
         print("a new model created")
     else:
-        model, losses_train, losses_test, accuracies_train, accuracies_test, _ = load_model()
+        model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _ = load_model()
 
     model.to(device)
     print(f"model moved to device: {device} - {torch.cuda.get_device_name(torch.cuda.device)}")
+    print(f"number of parameters: {sum(p.numel() for p in model.parameters())}")
 
-    # train (and test during training)
+    # train
     if args_train_model:
         epochs = NR_EPOCHS
         for epoch in range(epochs):
             correct = 0
             total = 0
 
-            overall_correct = 0
-            overall_total = 0
-
             losses_train_e = []
             model.train()
-            for inp, label in tqdm(train_dataloader, desc=f"epoch {epoch+1}/{epochs}"):
+            train_loop = tqdm(train_dataloader, desc=f"epoch {epoch+1}/{epochs}")
+            for inp, label in train_loop:
                 inp = inp.to(device)
                 label = label.to(device)
 
@@ -375,21 +389,21 @@ def main():
                 true_classes = label.argmax(dim=1)
                 correct += (pred_classes == true_classes).sum().item()
                 total += label.size(0)
-                overall_correct += correct
-                overall_total += total
+
             accuracy = correct / total
 
             losses_train.extend(losses_train_e)
             accuracies_train.append(accuracy)
             print(f"training avg loss: {np.mean(losses_train_e)} (accuracy: {accuracies_train[-1]})")
-            losses_test, accuracies_test, test_correct, test_total = test_model(model, test_dataloader, loss_criterion, losses_test, accuracies_test, device)
 
-            overall_correct += test_correct
-            overall_total += test_total
+            #  validation
+            lval, aval = [], []
+            lval, aval = run_model_on_dataset(model, val_dataloader, loss_criterion, lval, aval, device, "validation")
+            losses_val.extend(lval)
+            accuracies_val.append(aval)
 
-            overall_accuracy = overall_correct / overall_total
-            print(f"accuracy over the whole dataset: {overall_accuracy}")
-
+    accuracy_test = []
+    _, accuracy_test = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracy_test, device)
 
     # save
     if args_train_model:
@@ -399,28 +413,22 @@ def main():
         torch.save({
             "model_state_dict": model.state_dict(),
             "losses_train": losses_train,
-            "losses_test": losses_test,
+            "losses_val": losses_val,
             "accuracies_train": accuracies_train,
-            "accuracies_test": accuracies_test
+            "accuracies_val": accuracies_val,
+            "accuracy_test": accuracy_test
         }, OUTPUT_DIR + save_filename + ".pth")
         print("Model saved.")
 
     # test
     if args_test_model:
-        dummy = input("dummy (press enter)")
-        nr_test = int(input("> nr of times to test: "))
-        losses = []
-        accuracies = []
-        if nr_test > 0:
-            for _ in range(nr_test):
-                losses, accuracies, _, _ = test_model(model, test_dataloader, loss_criterion, losses, accuracies, device)
-        print(f"Average test loss: {np.mean(losses)}")
+        accuracies = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracies, device)
         print(f"Average test accuracy: {np.mean(accuracies)}")
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot results? (y/n)")
     if yes == "y":
-        plot(losses_train, losses_test, accuracies_train, accuracies_test)
+        plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test)
 
     print("done.")
 

@@ -136,7 +136,19 @@ def convert_mesh(mesh_filepath, voxel_size, model_grid_shape):
     mesh = o3d.io.read_triangle_mesh(mesh_filepath)
     mesh.compute_vertex_normals()
 
-    mesh.scale(1 / np.max(mesh.get_max_bound() - mesh.get_min_bound()), center=mesh.get_center())
+    aabb = mesh.get_axis_aligned_bounding_box()
+    if aabb.is_empty():
+        print(f"The axis-aligned bounding box for file {mesh_filepath} is empty. Skipping...")
+        return None
+    # o3d.visualization.draw([mesh, aabb])
+    mesh = mesh.crop(aabb)
+
+    mesh.translate(-mesh.get_min_bound())
+    mesh = mesh.scale(1 / np.max(mesh.get_max_bound() - mesh.get_min_bound()), center=mesh.get_center())
+    mesh.translate(-mesh.get_min_bound())
+
+    mesh.compute_vertex_normals()
+    # o3d.io.write_triangle_mesh("test.off", mesh)
 
     voxel_grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(mesh, voxel_size=voxel_size)
 
@@ -145,10 +157,10 @@ def convert_mesh(mesh_filepath, voxel_size, model_grid_shape):
     # print(f"number of voxels: {len(voxels)}")
 
     # # Normalize indices to start at (0,0,0)
-    # min_idx_0 = min(x[0] for x in voxels)
-    # min_idx_1 = min(x[1] for x in voxels)
-    # min_idx_2 = min(x[2] for x in voxels)
-    # voxels = np.subtract(voxels, (min_idx_0, min_idx_1, min_idx_2))
+    min_idx_0 = min(x[0] for x in voxels)
+    min_idx_1 = min(x[1] for x in voxels)
+    min_idx_2 = min(x[2] for x in voxels)
+    voxels = np.subtract(voxels, (min_idx_0, min_idx_1, min_idx_2))
 
     max_idx_0 = max(x[0] for x in voxels)
     max_idx_1 = max(x[1] for x in voxels)
@@ -161,11 +173,10 @@ def convert_mesh(mesh_filepath, voxel_size, model_grid_shape):
     for v in voxels:
         model_grid[v[0], v[1], v[2]] = 1
 
+    # plot_voxel_grid(model_grid)
     return model_grid
 
-def process_meshes(meshes_dir, output_dir, voxel_size):
-
-    model_grid_shape = get_model_grid_shape(meshes_dir, voxel_size)
+def process_meshes(meshes_dir, output_dir, voxel_size, model_grid_shape):
     print("#########################################################")
     print(f"MODEL GRID SHAPE: {model_grid_shape}")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -185,8 +196,7 @@ def process_meshes(meshes_dir, output_dir, voxel_size):
                 continue
 
             model_grid = convert_mesh(os.path.join(root, file), voxel_size, model_grid_shape)
-
-            # plot_voxel_grid(model_grid)
+            if model_grid is None: continue
 
             Path(os.path.join(output_dir + out_out_dir)).mkdir(parents=True, exist_ok=True)
             np.save(os.path.join(output_dir + out_out_dir, f"{out_filename}.npy"), model_grid)
@@ -197,6 +207,30 @@ def process_meshes(meshes_dir, output_dir, voxel_size):
     print(f"MODEL GRID SHAPE: {model_grid_shape}")
     print("#########################################################")
 
+def rotate_mesh(mesh_filepath, output_folder):
+    mesh = o3d.io.read_triangle_mesh(mesh_filepath)
+    mesh.compute_vertex_normals()
+    rotating_angle = np.pi/2
+    R_x = mesh.get_rotation_matrix_from_xyz((rotating_angle, 0, 0))
+    R_y = mesh.get_rotation_matrix_from_xyz((0, rotating_angle, 0))
+    R_z = mesh.get_rotation_matrix_from_xyz((0, 0, rotating_angle))
+    rotated_mesh_x = mesh.rotate(R_x,center=mesh.get_center())
+    rotated_mesh_y = mesh.rotate(R_y,center=mesh.get_center())
+    rotated_mesh_z = mesh.rotate(R_z,center=mesh.get_center())
+    base_filename = os.path.splitext(os.path.basename(mesh_filepath))[0]
+    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_x.off"), rotated_mesh_x)
+    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_y.off"), rotated_mesh_y)
+    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_z.off"), rotated_mesh_z)
+    print(f"AUGMENTATION OUTPUT {os.path.join(output_folder, f"{base_filename}_rotated_xyz.off")}")
+
+def augment(meshes_dir):
+     for root, _, files in os.walk(meshes_dir):
+        if not os.path.basename(root) == 'train': continue
+        for file in files:
+            if not file.endswith(".off"): continue
+            file_path = os.path.join(root,file)
+            rotate_mesh(file_path, root)
+
 def get_label_id(label_str):
     return modelnet40_label_to_idx[label_str]
 
@@ -204,8 +238,11 @@ def get_label_str(filename):
     l = filename.split("_")
     s = ""
     for i in range(len(l) - 1):
-        s = s + l[i]
-        if i != len(l) - 2: s = s + "_"
+        if l[i][0].isdigit():
+            break
+        s = s + l[i] + "_"
+
+    s = s[:-1]
     return s
 
 def label_id_to_np(label_id):
@@ -276,5 +313,12 @@ if __name__ == "__main__":
     DATASET_PROCESSED_PATH = "./data/out/"
     VOXEL_SIZE = 0.02
 
+    augment(DATASET_PATH)
     fix_off_files(DATASET_PATH)
-    process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE)
+    # model_grid_shape = get_model_grid_shape(DATASET_PATH, VOXEL_SIZE)
+    model_grid_shape = (51, 51, 51)
+    process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE, model_grid_shape)
+
+    ##################### DUMMY #####################
+    # DUMMY = "./data/dummy/"
+    # process_meshes(DUMMY, DATASET_PROCESSED_PATH, VOXEL_SIZE)
