@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from data import VGDataset, plot_voxel_grid
+from data import VGDataset, plot_voxel_grid, find_small_scale_vgs
 from model import Classifier3D
 
 # DATASET_PATH = "./data/ModelNet40/"
@@ -247,7 +247,8 @@ def main():
     print("5. Load an existing model and only test.")
     print("6. Demo existing model.")
     print("7. Test existing model over the whole dataset.")
-    print("8. Plot small scale voxel grids.")
+    print("8. Find small scale voxel grids.")
+    print("9. Plot voxel grid.")
 
     args_in = input("> Select (default: 6): ")
     if args_in == "": args_in = "6"
@@ -282,32 +283,23 @@ def main():
             global DATASET_PROCESSED_PATH
             train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train")
             test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
-            # train_dataloader = DataLoader(train_dataset, 1, shuffle=True)
-            # test_dataloader = DataLoader(test_dataset, 1, shuffle=True)
 
-            count = 0
-            for i in range(len(train_dataset)):
-                inp, label = train_dataset[i]
-                if torch.sum(inp) < 300:
-                    count += 1
-                    print(train_dataset.get_filename(i))
-                    print(torch.sum(inp))
-                    plot_voxel_grid(inp.numpy()) # uncomment the filenames thing in the dataset for these
-            print(f"train count: {count}")
+            kernel_size = 15
 
-            count = 0
-            for i in range(len(test_dataset)):
-                inp, label = test_dataset[i]
-                if torch.sum(inp) < 300:
-                    count += 1
-                    print(train_dataset.get_filename(i))
-                    print(torch.sum(inp))
-                    plot_voxel_grid(inp.numpy())
-            print(f"test count: {count}")
+            train_small_scales = find_small_scale_vgs(train_dataset, kernel_size)
+            print(f"train count: {len(train_small_scales)}")
 
-            # vg_filepath = input("> enter voxel grid filepath: ")
-            # vg = np.load(vg_filepath, allow_pickle=True)
-            # plot_voxel_grid(vg)
+            test_small_scales = find_small_scale_vgs(test_dataset, kernel_size)
+            print(f"test count: {len(test_small_scales)}")
+
+            exit()
+        case "9":
+            dummy = input("dummy (press enter)")
+            filepath = input("> enter filepath (.npy): ")
+            while filepath != "":
+                vg = np.load(filepath)
+                plot_voxel_grid(vg)
+                filepath = input("> enter filepath (.npy): ")
             exit()
         case _:
             print("??")

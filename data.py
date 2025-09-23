@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -244,6 +245,29 @@ class VGDataset(Dataset):
     def get_filename(self, idx):
         return self.filenames[idx]
 
+def find_small_scale_vgs(dataset: VGDataset, kernel_size):
+    bad_boys = []
+
+    for i in range(len(dataset)):
+        inp, label = dataset[i]
+        inp_sum = torch.sum(inp)
+
+        kernel = torch.ones((1, 1, kernel_size, kernel_size, kernel_size))
+        inp = inp.unsqueeze(0)
+        inp = inp.unsqueeze(0)
+        out = F.conv3d(inp, kernel)
+        # print(f"{dataset.get_filename(i)} - inp_sum: {inp_sum} - out.max: {torch.max(out)}")
+        if torch.max(out) == inp_sum:
+            print(dataset.get_filename(i))
+            # print("input:")
+            # plot_voxel_grid(inp[0, 0, :].numpy())
+            # print("out:")
+            # plot_voxel_grid(out[0, 0, :].numpy())
+            bad_boys.append(dataset.get_filename(i))
+
+    print(bad_boys)
+
+    return bad_boys
 
 if __name__ == "__main__":
     # process_meshes("./data/dummy/", "./data/dummy/out/", VOXEL_SIZE)
