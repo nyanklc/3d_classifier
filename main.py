@@ -332,10 +332,14 @@ def main():
 
     # dataset
     print("loading train/test datasets...")
-    train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train")
-    train_split_len = int(len(train_dataset)*(1-VALIDATION_PERCENTAGE))
-    train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_split_len, len(train_dataset)-train_split_len])
+    # train/val split
+    dataset_for_split = VGDataset(DATASET_PROCESSED_PATH, "train")
+    split_len = int(len(dataset_for_split)*(1-VALIDATION_PERCENTAGE))
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset_for_split, [split_len, len(dataset_for_split)-split_len])
+    # add augmented samples
+    train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train", train_dataset.dataset, train_dataset.indices)
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
+
     train_dataloader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
     val_dataloader = DataLoader(val_dataset, BATCH_SIZE, shuffle=True)
     test_dataloader = DataLoader(test_dataset, BATCH_SIZE, shuffle=True)
@@ -422,7 +426,7 @@ def main():
 
     # test
     if args_test_model:
-        accuracies = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracies, device)
+        _, accuracies = run_model_on_dataset(model, test_dataloader, loss_criterion, None, [], device)
         print(f"Average test accuracy: {np.mean(accuracies)}")
 
     dummy = input("dummy (press enter)")

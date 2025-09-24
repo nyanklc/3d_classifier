@@ -6,6 +6,7 @@ import numpy as np
 import os
 import open3d as o3d
 from pathlib import Path
+import copy
 
 modelnet40_label_to_idx = {
     "airplane": 0,
@@ -214,9 +215,9 @@ def rotate_mesh(mesh_filepath, output_folder):
     R_x = mesh.get_rotation_matrix_from_xyz((rotating_angle, 0, 0))
     R_y = mesh.get_rotation_matrix_from_xyz((0, rotating_angle, 0))
     R_z = mesh.get_rotation_matrix_from_xyz((0, 0, rotating_angle))
-    rotated_mesh_x = mesh.rotate(R_x,center=mesh.get_center())
-    rotated_mesh_y = mesh.rotate(R_y,center=mesh.get_center())
-    rotated_mesh_z = mesh.rotate(R_z,center=mesh.get_center())
+    rotated_mesh_x = copy.deepcopy(mesh).rotate(R_x,center=mesh.get_center())
+    rotated_mesh_y = copy.deepcopy(mesh).rotate(R_y,center=mesh.get_center())
+    rotated_mesh_z = copy.deepcopy(mesh).rotate(R_z,center=mesh.get_center())
     base_filename = os.path.splitext(os.path.basename(mesh_filepath))[0]
     o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_x.off"), rotated_mesh_x)
     o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_y.off"), rotated_mesh_y)
@@ -253,24 +254,35 @@ def label_id_to_np(label_id):
 # type either "train" or "test"
 class VGDataset(Dataset):
 
-    def __init__(self, dataset_path, type: str):
+    # does not load augmented data on construction
+    def __init__(self, dataset_path, type: str, copy_from=None, indices=None):
         self.data = []
         self.labels = []
         self.filenames = []
-        self.label_set = {}
         self.path = dataset_path
 
-        for root, _, files in os.walk(self.path):
-            for file in files:
-                if not file.endswith(".npy"): continue
+        if copy_from is None or indices is None:
+            for root, _, files in os.walk(self.path):
+                for file in files:
+                    parent_dir_name = os.path.basename(root)
+                    if parent_dir_name != type: continue
 
-                parent_dir_name = os.path.basename(root)
-                if parent_dir_name != type: continue
+                    if not file.endswith(".npy"): continue
 
-                self.filenames.append(os.path.join(root, file))
-                d = torch.from_numpy(np.load(os.path.join(root, file), allow_pickle=True)).float()
-                self.data.append(d)
-                self.labels.append(torch.from_numpy(label_id_to_np(get_label_id(get_label_str(file)))))
+                    # skip the augmented samples for now
+                    if "rotated" in file: continue
+
+                    self.filenames.append(os.path.join(root, file))
+                    d = torch.from_numpy(np.load(os.path.join(root, file), allow_pickle=True)).float()
+                    self.data.append(d)
+                    self.labels.append(torch.from_numpy(label_id_to_np(get_label_id(get_label_str(file)))))
+        else:
+            for index in indices:
+                self.data.append(copy_from.data[index])
+                self.labels.append(copy_from.labels[index])
+                self.filenames.append(copy_from.filenames[index])
+            self.path = copy_from.path
+            self.add_augmenteds(dataset_path, type)
 
 
     def __len__(self):
@@ -281,6 +293,31 @@ class VGDataset(Dataset):
 
     def get_filename(self, idx):
         return self.filenames[idx]
+
+    def add_augmenteds(self, dataset_path, type: str):
+        for root, _, files in os.walk(self.path):
+            for file in files:
+                parent_dir_name = os.path.basename(root)
+                if parent_dir_name != type: continue
+
+                if not file.endswith(".npy"): continue
+
+                # loop over only the augmenteds
+                if not "rotated" in file: continue
+
+                # get the original filename
+                split = file.split("_")
+                original_file = ""
+                for i in range(len(split) - 2):
+                    original_file += split[i] + "_"
+                original_file = original_file[:-1] + ".npy"
+
+                if not os.path.join(root, original_file) in self.filenames: continue
+
+                self.filenames.append(os.path.join(root, file))
+                d = torch.from_numpy(np.load(os.path.join(root, file), allow_pickle=True)).float()
+                self.data.append(d)
+                self.labels.append(torch.from_numpy(label_id_to_np(get_label_id(get_label_str(file)))))
 
 def find_small_scale_vgs(dataset: VGDataset, kernel_size):
     bad_boys = []
@@ -313,8 +350,8 @@ if __name__ == "__main__":
     DATASET_PROCESSED_PATH = "./data/out/"
     VOXEL_SIZE = 0.02
 
-    augment(DATASET_PATH)
-    fix_off_files(DATASET_PATH)
+    # augment(DATASET_PATH)
+    # fix_off_files(DATASET_PATH)
     # model_grid_shape = get_model_grid_shape(DATASET_PATH, VOXEL_SIZE)
     model_grid_shape = (51, 51, 51)
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE, model_grid_shape)
