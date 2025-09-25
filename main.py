@@ -20,17 +20,39 @@ NR_EPOCHS = 30
 
 VALIDATION_PERCENTAGE = 0.2
 
+# train, val, and test datasets loaded, lenghts: 26043, 1967, 2465
+TRAIN_LEN = 7866
+VAL_LEN = 1967
+TEST_LEN = 2465
+
 OUTPUT_DIR = "./out/"
 
 def plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test):
-    # loss
+    # loss batch
     plt.figure(figsize=(10,5))
     plt.plot(losses_train, label="Training Loss")
     plt.plot(losses_val, label="Validation Loss")
     plt.xlabel("Batch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.title("Training/Validation/Test Loss")
+    plt.title(f"Loss (per batch), Test Accuracy {accuracy_test[-1]}")
+    plt.grid()
+    plt.show()
+
+    # loss epoch
+    train_batch_count_per_epoch: float = float(TRAIN_LEN) / float(BATCH_SIZE)
+    if int(train_batch_count_per_epoch) < train_batch_count_per_epoch: train_batch_count_per_epoch = int(train_batch_count_per_epoch)+1
+    val_batch_count_per_epoch: float = float(VAL_LEN) / float(BATCH_SIZE)
+    if int(val_batch_count_per_epoch) < val_batch_count_per_epoch: val_batch_count_per_epoch = int(val_batch_count_per_epoch)+1
+    train_loss_avg_per_epoch = [sum(losses_train[i:i+train_batch_count_per_epoch])/len(losses_train[i:i+train_batch_count_per_epoch]) for i in range(0, len(losses_train), train_batch_count_per_epoch)]
+    val_loss_avg_per_epoch = [sum(losses_val[i:i+val_batch_count_per_epoch])/len(losses_val[i:i+val_batch_count_per_epoch]) for i in range(0, len(losses_val), val_batch_count_per_epoch)]
+    plt.figure(figsize=(10,5))
+    plt.plot(train_loss_avg_per_epoch, label="Training Loss")
+    plt.plot(val_loss_avg_per_epoch, label="Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title(f"Loss (per epoch), Test Accuracy {accuracy_test[-1]}")
     plt.grid()
     plt.show()
 
@@ -38,11 +60,10 @@ def plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_te
     plt.figure(figsize=(10,5))
     plt.plot(accuracies_train, label="Training Accuracy")
     plt.plot(accuracies_val, label="Validation Accuracy")
-    plt.title(f"Test Accuracy {accuracy_test[-1]}")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.title("Training/Validation/Test Accuracy")
+    plt.title(f"Accuracy, Test Accuracy {accuracy_test[-1]}")
     plt.grid()
     plt.show()
 
@@ -64,8 +85,12 @@ def load_model():
     accuracies_train = checkpoint["accuracies_train"]
     accuracies_val = checkpoint["accuracies_val"]
     accuracy_test = checkpoint["accuracy_test"]
+    opt_state_dict = checkpoint["opt_state_dict"]
+    global BATCH_SIZE
+    BATCH_SIZE = checkpoint["BATCH_SIZE"]
+    print(f"set batch size: {BATCH_SIZE} because loaded model used it apparently")
 
-    return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename
+    return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename, opt_state_dict
 
 # TODO: i think python takes arrays as reference, so no need to return (may be causing extra copy operations idk).
 def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, device, name="test"):
@@ -106,7 +131,7 @@ def demo_model():
     from data import convert_mesh
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _ = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, _ = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
@@ -155,13 +180,19 @@ def benchmark():
     from data import get_label_str, get_label_id, label_id_to_np
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, model_filename = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, model_filename, _ = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
     if yes == "": yes = "n"
     if yes == "y":
         plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test)
+
+    dummy = input("dummy (press enter)")
+    inpinp = input("> only benchmark on the test dataset? (y/n)")
+    only_test = False
+    if inpinp == "y":
+        only_test = True
 
     import pandas as pd
 
@@ -175,6 +206,9 @@ def benchmark():
             for file in files:
                 if not file.endswith(".npy"):
                     continue
+
+                parent_dir_name = os.path.basename(root)
+                if only_test and parent_dir_name != "test": continue
 
                 print(file)
 
@@ -336,7 +370,7 @@ def main():
     dataset_for_split = VGDataset(DATASET_PROCESSED_PATH, "train")
     split_len = int(len(dataset_for_split)*(1-VALIDATION_PERCENTAGE))
     train_dataset, val_dataset = torch.utils.data.random_split(dataset_for_split, [split_len, len(dataset_for_split)-split_len])
-    # add augmented samples
+    # # add augmented samples
     train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train", train_dataset.dataset, train_dataset.indices)
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
 
@@ -347,7 +381,7 @@ def main():
 
     # definitions
     model = Classifier3D()
-    opt = optim.Adam(model.parameters(), lr=1e-4)#, weight_decay=6e-3)
+    opt = optim.Adam(model.parameters(), lr=1e-3)#, weight_decay=6e-3)
     loss_criterion = nn.CrossEntropyLoss()
     losses_train = []
     losses_val = []
@@ -358,7 +392,8 @@ def main():
     if not args_load_model:
         print("a new model created")
     else:
-        model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _ = load_model()
+        model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, opt_state_dict = load_model()
+        opt.load_state_dict(opt_state_dict)
 
     model.to(device)
     print(f"model moved to device: {device} - {torch.cuda.get_device_name(torch.cuda.device)}")
@@ -381,7 +416,8 @@ def main():
                 out = model(inp)
 
                 loss = loss_criterion(out, label)
-                opt.zero_grad()
+
+                opt.zero_grad(set_to_none=True)
                 loss.backward()
                 opt.step()
 
@@ -404,7 +440,7 @@ def main():
             lval, aval = [], []
             lval, aval = run_model_on_dataset(model, val_dataloader, loss_criterion, lval, aval, device, "validation")
             losses_val.extend(lval)
-            accuracies_val.append(aval)
+            accuracies_val.extend(aval)
 
     accuracy_test = []
     _, accuracy_test = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracy_test, device)
@@ -416,11 +452,13 @@ def main():
         save_filename = input("> Save the file to (just the file name, without extension): ")
         torch.save({
             "model_state_dict": model.state_dict(),
+            "opt_state_dict": opt.state_dict(),
             "losses_train": losses_train,
             "losses_val": losses_val,
             "accuracies_train": accuracies_train,
             "accuracies_val": accuracies_val,
-            "accuracy_test": accuracy_test
+            "accuracy_test": accuracy_test,
+            "BATCH_SIZE": BATCH_SIZE
         }, OUTPUT_DIR + save_filename + ".pth")
         print("Model saved.")
 

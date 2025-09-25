@@ -212,17 +212,21 @@ def rotate_mesh(mesh_filepath, output_folder):
     mesh = o3d.io.read_triangle_mesh(mesh_filepath)
     mesh.compute_vertex_normals()
     rotating_angle = np.pi/2
-    R_x = mesh.get_rotation_matrix_from_xyz((rotating_angle, 0, 0))
-    R_y = mesh.get_rotation_matrix_from_xyz((0, rotating_angle, 0))
-    R_z = mesh.get_rotation_matrix_from_xyz((0, 0, rotating_angle))
-    rotated_mesh_x = copy.deepcopy(mesh).rotate(R_x,center=mesh.get_center())
-    rotated_mesh_y = copy.deepcopy(mesh).rotate(R_y,center=mesh.get_center())
-    rotated_mesh_z = copy.deepcopy(mesh).rotate(R_z,center=mesh.get_center())
-    base_filename = os.path.splitext(os.path.basename(mesh_filepath))[0]
-    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_x.off"), rotated_mesh_x)
-    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_y.off"), rotated_mesh_y)
-    o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_z.off"), rotated_mesh_z)
-    print(f"AUGMENTATION OUTPUT {os.path.join(output_folder, f"{base_filename}_rotated_xyz.off")}")
+    rotating_angles = [np.pi/4, np.pi/2, np.pi*3/4, np.pi, -np.pi/4, -np.pi/2, -np.pi*3/4]
+
+    # R_x = mesh.get_rotation_matrix_from_xyz((rotating_angle, 0, 0))
+    # R_y = mesh.get_rotation_matrix_from_xyz((0, rotating_angle, 0))
+    # rotated_mesh_x = copy.deepcopy(mesh).rotate(R_x,center=mesh.get_center())
+    # rotated_mesh_y = copy.deepcopy(mesh).rotate(R_y,center=mesh.get_center())
+    # o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_x.off"), rotated_mesh_x)
+    # o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_y.off"), rotated_mesh_y)
+
+    for i, rotating_angle in enumerate(rotating_angles):
+        R_z = mesh.get_rotation_matrix_from_xyz((0, 0, rotating_angle))
+        rotated_mesh_z = copy.deepcopy(mesh).rotate(R_z,center=mesh.get_center())
+        base_filename = os.path.splitext(os.path.basename(mesh_filepath))[0]
+        o3d.io.write_triangle_mesh(os.path.join(output_folder, f"{base_filename}_rotated_z"+str(i)+".off"), rotated_mesh_z)
+        print(f"AUGMENTATION OUTPUT {os.path.join(output_folder, f"{base_filename}_rotated_z"+str(i)+".off")}")
 
 def augment(meshes_dir):
      for root, _, files in os.walk(meshes_dir):
@@ -350,8 +354,8 @@ if __name__ == "__main__":
     DATASET_PROCESSED_PATH = "./data/out/"
     VOXEL_SIZE = 0.02
 
-    # augment(DATASET_PATH)
-    # fix_off_files(DATASET_PATH)
+    augment(DATASET_PATH)
+    fix_off_files(DATASET_PATH)
     # model_grid_shape = get_model_grid_shape(DATASET_PATH, VOXEL_SIZE)
     model_grid_shape = (51, 51, 51)
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE, model_grid_shape)
