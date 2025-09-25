@@ -21,22 +21,23 @@ class Classifier3D(nn.Module):
         # input 51x51x51
         # voxnet
         self.net = nn.Sequential(
-            nn.Dropout(0.2),
-            nn.Conv3d(in_channels=1, out_channels=40, kernel_size=3, stride=2), # 40 * 25
-            nn.BatchNorm3d(40),
+            nn.Conv3d(in_channels=1, out_channels=8, kernel_size=3, stride=2), # 8 * 25
+            nn.BatchNorm3d(8),
             nn.LeakyReLU(),
-            nn.Conv3d(in_channels=40, out_channels=80, kernel_size=3, stride=1), # 80 * 22
-            nn.BatchNorm3d(80),
+            nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3, stride=1), # 16 * 22
+            nn.BatchNorm3d(16),
             nn.LeakyReLU(),
-            nn.MaxPool3d(2), # 80 * 11
-            nn.Conv3d(in_channels=80, out_channels=128, kernel_size=3, stride=2), # 128 * 5
-            nn.BatchNorm3d(128),
+            nn.MaxPool3d(2), # 16 * 11
+            nn.Conv3d(in_channels=16, out_channels=32, kernel_size=3, stride=2), # 32 * 5
+            nn.BatchNorm3d(32),
             nn.LeakyReLU(),
             nn.Flatten(),
-            nn.Linear(in_features=16000, out_features=128),
+            nn.Linear(in_features=4000, out_features=128),
             nn.Dropout(),
             nn.LeakyReLU(),
-            nn.Linear(in_features=128, out_features=40)
+            nn.Linear(in_features=128, out_features=64),
+            nn.ReLU(),
+            nn.Linear(in_features=64, out_features=40)
         )
 
         # permutation

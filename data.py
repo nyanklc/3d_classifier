@@ -7,6 +7,9 @@ import os
 import open3d as o3d
 from pathlib import Path
 import copy
+# import threading
+
+THREAD_COUNT = 8
 
 modelnet40_label_to_idx = {
     "airplane": 0,
@@ -229,12 +232,25 @@ def rotate_mesh(mesh_filepath, output_folder):
         print(f"AUGMENTATION OUTPUT {os.path.join(output_folder, f"{base_filename}_rotated_z"+str(i)+".off")}")
 
 def augment(meshes_dir):
-     for root, _, files in os.walk(meshes_dir):
+    # tcount = 0
+    # threads = []
+    for root, _, files in os.walk(meshes_dir):
         if not os.path.basename(root) == 'train': continue
         for file in files:
             if not file.endswith(".off"): continue
             file_path = os.path.join(root,file)
             rotate_mesh(file_path, root)
+    #         threads.append(threading.Thread(target=rotate_mesh, args=(file_path, root)))
+    #         tcount += 1
+    #         if tcount == THREAD_COUNT:
+    #             for t in threads: t.start()
+    #             for t in threads: t.join()
+    #             tcount = 0
+    #             threads.clear()
+    # if tcount > 0:
+    #     for t in threads: t.start()
+    #     for t in threads: t.join()
+    #     threads.clear()
 
 def get_label_id(label_str):
     return modelnet40_label_to_idx[label_str]
@@ -354,8 +370,8 @@ if __name__ == "__main__":
     DATASET_PROCESSED_PATH = "./data/out/"
     VOXEL_SIZE = 0.02
 
-    augment(DATASET_PATH)
-    fix_off_files(DATASET_PATH)
+    # augment(DATASET_PATH)
+    # fix_off_files(DATASET_PATH)
     # model_grid_shape = get_model_grid_shape(DATASET_PATH, VOXEL_SIZE)
     model_grid_shape = (51, 51, 51)
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE, model_grid_shape)
