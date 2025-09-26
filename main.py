@@ -40,9 +40,9 @@ def plot(losses_train, losses_val, accuracies_train, accuracies_val, accuracy_te
     plt.show()
 
     # loss epoch
-    train_batch_count_per_epoch: float = float(TRAIN_LEN) / float(BATCH_SIZE)
+    train_batch_count_per_epoch: float = float(TRAIN_LEN) / float(BATCH_SIZE) / len(accuracies_val)
     if int(train_batch_count_per_epoch) < train_batch_count_per_epoch: train_batch_count_per_epoch = int(train_batch_count_per_epoch)+1
-    val_batch_count_per_epoch: float = float(VAL_LEN) / float(BATCH_SIZE)
+    val_batch_count_per_epoch: float = float(VAL_LEN) / float(BATCH_SIZE) / len(accuracies_val)
     if int(val_batch_count_per_epoch) < val_batch_count_per_epoch: val_batch_count_per_epoch = int(val_batch_count_per_epoch)+1
     train_loss_avg_per_epoch = [sum(losses_train[i:i+train_batch_count_per_epoch])/len(losses_train[i:i+train_batch_count_per_epoch]) for i in range(0, len(losses_train), train_batch_count_per_epoch)]
     val_loss_avg_per_epoch = [sum(losses_val[i:i+val_batch_count_per_epoch])/len(losses_val[i:i+val_batch_count_per_epoch]) for i in range(0, len(losses_val), val_batch_count_per_epoch)]
@@ -356,6 +356,7 @@ def main():
             exit()
 
     dummy = input("dummy (press enter)")
+    global BATCH_SIZE
     BATCH_SIZE = int(input("> enter batch size: "))
     NR_EPOCHS = 0
     if args_train_model:
@@ -372,16 +373,20 @@ def main():
     # dataset
     print("loading train/test datasets...")
     # train/val split
+    train_indices = []
+    val_indices = []
     dataset_for_split = VGDataset(DATASET_PROCESSED_PATH, "train")
     split_len = int(len(dataset_for_split)*(1-VALIDATION_PERCENTAGE))
     train_dataset, val_dataset = torch.utils.data.random_split(dataset_for_split, [split_len, len(dataset_for_split)-split_len])
+    train_indices = train_dataset.indices
+    val_indices = val_dataset.indices
     # # add augmented samples
     train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train", train_dataset.dataset, train_dataset.indices)
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
 
     # definitions
     model = Classifier3D()
-    opt = optim.Adam(model.parameters(), lr=1e-3)#, weight_decay=6e-3)
+    opt = optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-3)
     loss_criterion = nn.CrossEntropyLoss()
     losses_train = []
     losses_val = []

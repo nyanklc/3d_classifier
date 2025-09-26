@@ -21,33 +21,33 @@ class Classifier3D(nn.Module):
         # input 51x51x51
         # voxnet
         self.feature_extractor_3d = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=8, kernel_size=3, stride=2), # 8 * 25
+            nn.Conv3d(in_channels=1, out_channels=4, kernel_size=3, stride=2), # 4 * 25
+            nn.BatchNorm3d(4),
+            nn.LeakyReLU(),
+            nn.Conv3d(in_channels=4, out_channels=8, kernel_size=3, stride=1), # 8 * 23
             nn.BatchNorm3d(8),
             nn.LeakyReLU(),
-            nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3, stride=1), # 16 * 23
+            nn.MaxPool3d(2), # 8 * 11
+            nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3, stride=2), # 16 * 5
             nn.BatchNorm3d(16),
-            nn.LeakyReLU(),
-            nn.MaxPool3d(2), # 16 * 11
-            nn.Conv3d(in_channels=16, out_channels=32, kernel_size=3, stride=2), # 32 * 5
-            nn.BatchNorm3d(32),
             nn.LeakyReLU()
         )
 
         self.feature_extractor_2d = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=2), # 8 * 25
+            nn.Conv2d(in_channels=1, out_channels=4, kernel_size=3, stride=2), # 4 * 25
+            nn.BatchNorm2d(4),
+            nn.LeakyReLU(),
+            nn.Conv2d(in_channels=4, out_channels=8, kernel_size=3, stride=1), # 8 * 23
             nn.BatchNorm2d(8),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1), # 16 * 23
+            nn.MaxPool2d(2), # 8 * 11
+            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=2), # 16 * 5
             nn.BatchNorm2d(16),
-            nn.LeakyReLU(),
-            nn.MaxPool2d(2), # 16 * 11
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=2), # 32 * 5
-            nn.BatchNorm2d(32),
             nn.LeakyReLU()
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(in_features=13600, out_features=128),
+            nn.Linear(in_features=6800, out_features=128),
             nn.Dropout(),
             nn.LeakyReLU(),
             nn.Linear(in_features=128, out_features=64),
