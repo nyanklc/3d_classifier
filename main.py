@@ -20,8 +20,8 @@ NR_EPOCHS = 30
 
 VALIDATION_PERCENTAGE = 0.2
 
-# train, val, and test datasets loaded, lenghts: 26043, 1967, 2465
-TRAIN_LEN = 7866
+# train, val, and test datasets loaded, lenghts: 31464, 1967, 2465
+TRAIN_LEN = 31464
 VAL_LEN = 1967
 TEST_LEN = 2465
 
@@ -86,11 +86,16 @@ def load_model():
     accuracies_val = checkpoint["accuracies_val"]
     accuracy_test = checkpoint["accuracy_test"]
     opt_state_dict = checkpoint["opt_state_dict"]
+    train_indices = checkpoint["train_indices"]
+    val_indices = checkpoint["val_indices"]
     global BATCH_SIZE
     BATCH_SIZE = checkpoint["BATCH_SIZE"]
     print(f"set batch size: {BATCH_SIZE} because loaded model used it apparently")
 
-    return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename, opt_state_dict
+    # print(f"loading losses_val len: {len(losses_val)} last one: {losses_val[-1]}")
+    # print(f"loading accuracies_val len: {len(accuracies_val)} last one: {accuracies_val[-1]}")
+
+    return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename, opt_state_dict, train_indices, val_indices
 
 # TODO: i think python takes arrays as reference, so no need to return (may be causing extra copy operations idk).
 def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, device, name="test"):
@@ -131,7 +136,7 @@ def demo_model():
     from data import convert_mesh
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, _ = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, _, _, _ = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
@@ -180,7 +185,7 @@ def benchmark():
     from data import get_label_str, get_label_id, label_id_to_np
     idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
 
-    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, model_filename, _ = load_model()
+    model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, model_filename, _, _, _ = load_model()
 
     dummy = input("dummy (press enter)")
     yes = input("> Plot training results? (y/n) (default: n)")
@@ -374,11 +379,6 @@ def main():
     train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train", train_dataset.dataset, train_dataset.indices)
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
 
-    train_dataloader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, BATCH_SIZE, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, BATCH_SIZE, shuffle=True)
-    print(f"train, val, and test datasets loaded, lenghts: {len(train_dataset)}, {len(val_dataset)}, {len(test_dataset)}")
-
     # definitions
     model = Classifier3D()
     opt = optim.Adam(model.parameters(), lr=1e-3)#, weight_decay=6e-3)
@@ -392,8 +392,17 @@ def main():
     if not args_load_model:
         print("a new model created")
     else:
-        model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, opt_state_dict = load_model()
+        model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, _, opt_state_dict, train_indices, val_indices = load_model()
         opt.load_state_dict(opt_state_dict)
+        train_dataset = torch.utils.data.Subset(dataset_for_split, train_indices)
+        val_dataset = torch.utils.data.Subset(dataset_for_split, val_indices)
+        train_dataset = VGDataset(DATASET_PROCESSED_PATH, "train", train_dataset.dataset, train_dataset.indices)
+
+    print("loading train/test dataloaders...")
+    train_dataloader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, BATCH_SIZE, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, BATCH_SIZE, shuffle=True)
+    print(f"train, val, and test datasets loaded, lenghts: {len(train_dataset)}, {len(val_dataset)}, {len(test_dataset)}")
 
     model.to(device)
     print(f"model moved to device: {device} - {torch.cuda.get_device_name(torch.cuda.device)}")
@@ -458,8 +467,12 @@ def main():
             "accuracies_train": accuracies_train,
             "accuracies_val": accuracies_val,
             "accuracy_test": accuracy_test,
-            "BATCH_SIZE": BATCH_SIZE
+            "BATCH_SIZE": BATCH_SIZE,
+            "train_indices": train_indices,
+            "val_indices": val_indices,
         }, OUTPUT_DIR + save_filename + ".pth")
+        # print(f"saving losses_val len: {len(losses_val)} last one: {losses_val[-1]}")
+        # print(f"saving accuracies_val len: {len(accuracies_val)} last one: {accuracies_val[-1]}")
         print("Model saved.")
 
     # test
