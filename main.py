@@ -438,7 +438,7 @@ def main():
 
                 losses_train_e.append(loss.item())
 
-                if loss.item() < lowest_loss_train:
+                if loss.item() < 0.6 and loss.item() < lowest_loss_train:
                     lowest_loss_train = loss.item()
                     torch.save({
                         "model_state_dict": model.state_dict(),
