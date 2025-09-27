@@ -415,7 +415,7 @@ def main():
 
     # train
     if args_train_model:
-        lowest_loss_train = float("inf")
+        highest_acc_train = 0.0
         epochs = NR_EPOCHS
         for epoch in range(epochs):
             correct = 0
@@ -438,16 +438,6 @@ def main():
 
                 losses_train_e.append(loss.item())
 
-                if loss.item() < 0.6 and loss.item() < lowest_loss_train:
-                    lowest_loss_train = loss.item()
-                    torch.save({
-                        "model_state_dict": model.state_dict(),
-                        "opt_state_dict": opt.state_dict(),
-                        "BATCH_SIZE": BATCH_SIZE,
-                        "train_indices": train_indices,
-                        "val_indices": val_indices,
-                    }, OUTPUT_DIR + "out.pth")
-
                 preds = torch.zeros_like(out)
                 preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
                 pred_classes = preds.argmax(dim=1)
@@ -456,6 +446,16 @@ def main():
                 total += label.size(0)
 
             accuracy = correct / total
+
+            if accuracy > highest_acc_train:
+                highest_acc_train = accuracy
+                torch.save({
+                    "model_state_dict": model.state_dict(),
+                    "opt_state_dict": opt.state_dict(),
+                    "BATCH_SIZE": BATCH_SIZE,
+                    "train_indices": train_indices,
+                    "val_indices": val_indices,
+                }, OUTPUT_DIR + "out.pth")
 
             losses_train.extend(losses_train_e)
             accuracies_train.append(accuracy)
