@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+import copy
 
 from data import VGDataset, plot_voxel_grid, find_small_scale_vgs, get_label_str
-from model import Classifier3D
+from model import Classifier3D, AutoEncoder3D, Classifier3DWithEncoder
 
 # DATASET_PATH = "./data/ModelNet40/"
 DATASET_PROCESSED_PATH = "./data/out/"
@@ -78,7 +79,7 @@ def load_model():
         load_filename = input("> ")
 
     checkpoint = torch.load(load_filename, weights_only=False)
-    model = Classifier3D()
+    model = Classifier3DWithEncoder()
     model.load_state_dict(checkpoint["model_state_dict"])
     losses_train = checkpoint["losses_train"]
     losses_val = checkpoint["losses_val"]
@@ -107,17 +108,23 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
         model.eval()
         for inp, label in dataloader:
             inp = inp.to(device)
+# comment/uncomment this for autoencoder
+            # label = copy.deepcopy(inp).unsqueeze(1) # FOR AUTOENCODER
             label = label.to(device)
 
             out = model(inp)
             loss = loss_criterion(out, label)
             losses_e.append(loss.item())
 
+# comment/uncomment this for autoencoder
             preds = torch.zeros_like(out)
             preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
             pred_classes = preds.argmax(dim=1)
             true_classes = label.argmax(dim=1)
             correct += (pred_classes == true_classes).sum().item()
+            # out_binarized = (out >= 0.5).float()
+            # correct += (out_binarized == label).sum().item() / (51*51*51)
+
             total += label.size(0)
         accuracy = correct / total
         model.train()
@@ -285,6 +292,18 @@ def get_group(fname):
     # TODO
     return None
 
+def random_rotate_3d_discrete(x):
+    import random
+    out = []
+    for b in range(x.size(0)):
+        cube = x[b]
+        axes = (0, 1)
+        k = random.randint(0, 3)
+        rotated = torch.rot90(cube, k=k, dims=axes)
+        out.append(rotated)
+
+    return torch.stack(out, dim=0)
+
 def main():
     print("DON'T ENTER INVALID INPUTS, THERE ARE NO SANITY CHECKS")
     print("-----------------------------------------------")
@@ -299,6 +318,7 @@ def main():
     print("7. Test existing model over the whole dataset.")
     print("8. Find small scale voxel grids.")
     print("9. Plot voxel grid.")
+    print("10. train autoencoder")
 
     args_in = input("> Select (default: 6): ")
     if args_in == "": args_in = "6"
@@ -306,6 +326,7 @@ def main():
     args_load_model = False
     args_train_model = False
     args_test_model = False
+    args_autoencoder = False
     match args_in:
         case "1":
             args_train_model = True
@@ -351,6 +372,9 @@ def main():
                 plot_voxel_grid(vg)
                 filepath = input("> enter filepath (.npy): ")
             exit()
+        case "10":
+            args_autoencoder = True
+            args_train_model = True
         case _:
             print("??")
             exit()
@@ -385,9 +409,31 @@ def main():
     test_dataset = VGDataset(DATASET_PROCESSED_PATH, "test")
 
     # definitions
-    model = Classifier3D()
-    opt = optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-3)
-    loss_criterion = nn.CrossEntropyLoss()
+    # model = Classifier3D()
+
+    # get autoencoder encoder
+    autoencoder = None
+    if not args_autoencoder:
+        autoencoder = AutoEncoder3D()
+        checkpoint_ae = torch.load("./out/AUTOENCODER.pth", weights_only=False)
+        autoencoder.load_state_dict(checkpoint_ae["model_state_dict"])
+
+    model = None
+    if not args_autoencoder:
+        model = Classifier3D()
+# comment/uncomment this for autoencoder
+        # model.set_encoder(autoencoder.encoder)
+    else:
+        model = AutoEncoder3D()
+
+    opt = optim.NAdam(model.parameters(), lr=1e-3)
+    lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100, eta_min=1e-6)
+
+    loss_criterion = None
+    if args_autoencoder:
+        loss_criterion = nn.BCELoss()
+    else:
+        loss_criterion = nn.CrossEntropyLoss()
     losses_train = []
     losses_val = []
     accuracies_train = []
@@ -426,7 +472,12 @@ def main():
             train_loop = tqdm(train_dataloader, desc=f"epoch {epoch+1}/{epochs}")
             for inp, label in train_loop:
                 inp = inp.to(device)
+                if args_autoencoder:
+                    label = copy.deepcopy(inp).unsqueeze(1) # FOR AUTOENCODER
                 label = label.to(device)
+
+                # random rotation
+                inp = random_rotate_3d_discrete(inp)
 
                 out = model(inp)
 
@@ -438,11 +489,16 @@ def main():
 
                 losses_train_e.append(loss.item())
 
-                preds = torch.zeros_like(out)
-                preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
-                pred_classes = preds.argmax(dim=1)
-                true_classes = label.argmax(dim=1)
-                correct += (pred_classes == true_classes).sum().item()
+                if not args_autoencoder:
+                    preds = torch.zeros_like(out)
+                    preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
+                    pred_classes = preds.argmax(dim=1)
+                    true_classes = label.argmax(dim=1)
+                    correct += (pred_classes == true_classes).sum().item()
+                else:
+                    out_binarized = (out >= 0.5).float()
+                    correct += (out_binarized == label).sum().item() / (51*51*51)
+
                 total += label.size(0)
 
             accuracy = correct / total
@@ -466,6 +522,8 @@ def main():
             lval, aval = run_model_on_dataset(model, val_dataloader, loss_criterion, lval, aval, device, "validation")
             losses_val.extend(lval)
             accuracies_val.extend(aval)
+
+            lr_scheduler.step()
 
     accuracy_test = []
     _, accuracy_test = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracy_test, device)

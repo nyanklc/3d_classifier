@@ -267,6 +267,10 @@ def get_label_str(filename):
     return s
 
 def label_id_to_np(label_id):
+    # t = np.ones(len(modelnet40_label_to_idx))
+    # t = t * 0.1 / (len(modelnet40_label_to_idx) - 1)
+    # t[label_id] = 0.9
+
     t = np.zeros(len(modelnet40_label_to_idx))
     t[label_id] = 1
     return t
