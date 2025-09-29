@@ -14,6 +14,7 @@ from model import Classifier3D, AutoEncoder3D, Classifier3DWithEncoder
 # DATASET_PATH = "./data/ModelNet40/"
 DATASET_PROCESSED_PATH = "./data/out/"
 VOXEL_SIZE = 0.02
+# VOXEL_SIZE = 0.03125
 MODEL_GRID_SHAPE_FILE = DATASET_PROCESSED_PATH + "model_grid_shape.txt"
 
 BATCH_SIZE = 64

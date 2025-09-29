@@ -14,7 +14,7 @@ from model import Classifier3D, AutoEncoder3D, Classifier3DWithEncoder
 
 OUTPUT_DIR = "./out/"
 
-FILTER = "MCNN"
+FILTER = ""
 
 SMA_WINDOW_SIZE = 20
 def smooth_curve(values, window_size=SMA_WINDOW_SIZE):
@@ -69,15 +69,74 @@ print(f"hello {len(list_losses_train)}")
 saveto = f"{FILTER}/" if FILTER != "" else "./"
 Path(OUTPUT_DIR + "plots/" + saveto).mkdir(parents=True, exist_ok=True)
 
-
-
-
-
-
-
 # Define some linestyles to cycle through
 linestyles = ["-", "--", "-.", ":", (0, (3, 1, 1, 1))]  # last one is custom dash-dot
 linewidths = [1.0, 1.2, 1.0, 1.2, 1.0]  # vary slightly for readability
+
+
+for i in range(len(list_losses_train)):
+    tacc = "" if len(list_accuracy_test[i]) == 0 else list_accuracy_test[i][-1]
+    if tacc == "":
+        tacc = "" if len(list_accuracies_test[i]) == 0 else list_accuracies_test[i][-1]
+
+    smoothed = list_losses_train[i]
+    batches = range(1, len(smoothed) + 1)
+    plt.figure(figsize=(15, 8))
+    plt.plot(
+        batches,
+        smoothed,
+        label=f"{filenames[i][:-4]} (Test Accuracy {tacc})",
+    )
+    plt.xlabel("Batch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title(f"Training Loss")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_training_loss_batch.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    print("saved - " + OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_training_loss_batch.png")
+
+    smoothed = list_losses_val[i]
+    batches = range(1, len(smoothed) + 1)
+    plt.figure(figsize=(15, 8))
+    plt.plot(
+        batches,
+        smoothed,
+        label=f"{filenames[i][:-4]} (Test Accuracy {tacc})",
+    )
+    plt.xlabel("Batch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title(f"Validation Loss")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_validation_loss_batch.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    print("saved - " + OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_validation_loss_batch.png")
+
+    epochs = range(1, len(list_accuracies_val[i]) + 1)
+    plt.figure(figsize=(15, 8))
+    plt.plot(
+        epochs,
+        list_accuracies_val[i],
+        label=f"{filenames[i][:-4]} Validation Accuracy (Test Accuracy {tacc})",
+    )
+    plt.plot(
+        range(1, len(list_accuracies_train[i]) + 1),
+        list_accuracies_train[i],
+        label=f"{filenames[i][:-4]} Train Accuracy (Test Accuracy {tacc})",
+    )
+    plt.xlabel("Batch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title(f"Validation/Train Accuracy")
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_accuracy.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    print("saved - " + OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_accuracy.png")
+
+exit()
+
+
 
 # --- Training Loss ---
 plt.figure(figsize=(15, 8))
@@ -262,7 +321,7 @@ for i in range(len(list_accuracies_train)):
         linewidth=linewidths[i % len(linewidths)]
     )
 axes[0].set_xlim(40, 50)
-axes[0].set_ylim(0.9, 1.0)
+axes[0].set_ylim(0.80, 1.0)
 axes[0].set_ylabel("Accuracy")
 axes[0].set_title("Training Accuracy (Epochs 40–50)")
 axes[0].grid(True, which="both", linestyle="--", alpha=0.5)
@@ -278,7 +337,7 @@ for i in range(len(list_accuracies_val)):
         linewidth=linewidths[i % len(linewidths)]
     )
 axes[1].set_xlim(40, 50)
-axes[1].set_ylim(0.80, 0.95)
+axes[1].set_ylim(0.80, 1.0)
 axes[1].set_xlabel("Epoch")
 axes[1].set_ylabel("Accuracy")
 axes[1].set_title("Validation Accuracy (Epochs 40–50)")

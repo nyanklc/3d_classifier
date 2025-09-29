@@ -372,13 +372,15 @@ def find_small_scale_vgs(dataset: VGDataset, kernel_size):
 if __name__ == "__main__":
     # process_meshes("./data/dummy/", "./data/dummy/out/", VOXEL_SIZE)
 
-    DATASET_PATH = "./data/ModelNet40/"
+    DATASET_PATH = "./data/ModelNet10/"
     DATASET_PROCESSED_PATH = "./data/out/"
+    # VOXEL_SIZE = 0.03125
     VOXEL_SIZE = 0.02
 
     # augment(DATASET_PATH)
-    # fix_off_files(DATASET_PATH)
+    fix_off_files(DATASET_PATH)
     # model_grid_shape = get_model_grid_shape(DATASET_PATH, VOXEL_SIZE)
+    # model_grid_shape = (33, 33, 33)
     model_grid_shape = (51, 51, 51)
     process_meshes(DATASET_PATH, DATASET_PROCESSED_PATH, VOXEL_SIZE, model_grid_shape)
 
