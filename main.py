@@ -479,6 +479,7 @@ def main():
         model = AutoEncoder3D()
 
     opt = optim.Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.999), weight_decay=0.001)
+    # opt = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=0.001)
     # lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100, eta_min=1e-6)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt,mode='max',factor=0.5,patience=3)
 

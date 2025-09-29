@@ -14,6 +14,8 @@ from model import Classifier3D, AutoEncoder3D, Classifier3DWithEncoder
 
 OUTPUT_DIR = "./out/"
 
+FILTER = "monster"
+
 filenames = []
 list_losses_train = []
 list_losses_val = []
@@ -26,6 +28,9 @@ list_BATCH_SIZE = []
 for root, _, files in os.walk(OUTPUT_DIR):
     for file in files:
         if not file.endswith(".pth"): continue
+
+        if not FILTER in file: continue
+
         try:
             print(f"{os.path.join(root, file)}")
             checkpoint = torch.load(os.path.join(root, file), weights_only=False)
@@ -46,6 +51,8 @@ for root, _, files in os.walk(OUTPUT_DIR):
             print("FAIL")
 
 print(f"hello {len(list_losses_train)}")
+saveto = f"{FILTER}/" if FILTER != "" else "./"
+Path(OUTPUT_DIR + "plots/" + saveto).mkdir(parents=True, exist_ok=True)
 for i in range(len(list_losses_train)):
     # loss batch
     plt.figure(figsize=(15,8))
@@ -57,9 +64,9 @@ for i in range(len(list_losses_train)):
     tacc = "" if len(list_accuracy_test[i])==0 else list_accuracy_test[i][-1]
     if tacc == "":
         tacc = {"" if len(list_accuracies_test[i])==0 else list_accuracies_test[i][-1]}
-    plt.title(f"{filenames[i]} -- Loss (per batch), Test Accuracy {tacc}")
+    plt.title(f"Loss (per batch), Test Accuracy {tacc}")
     plt.grid()
-    plt.savefig(OUTPUT_DIR + "plots/" + f"{filenames[i]}_training_loss_batch.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_training_loss_batch.png", dpi=300, bbox_inches="tight")
     plt.close()
 
 
@@ -73,9 +80,10 @@ for i in range(len(list_losses_train)):
     tacc = "" if len(list_accuracy_test[i])==0 else list_accuracy_test[i][-1]
     if tacc == "":
         tacc = {"" if len(list_accuracies_test[i])==0 else list_accuracies_test[i][-1]}
-    plt.title(f"{filenames[i]} -- Loss (per batch), Test Accuracy {tacc}")
+    # {filenames[i]} --
+    plt.title(f"Loss (per batch), Test Accuracy {tacc}")
     plt.grid("minor")
-    plt.savefig(OUTPUT_DIR + "plots/" + f"{filenames[i]}_validation_loss_batch.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_validation_loss_batch.png", dpi=300, bbox_inches="tight")
     plt.close()
 
     # # loss epoch
@@ -99,7 +107,7 @@ for i in range(len(list_losses_train)):
     tacc = "" if len(list_accuracy_test[i])==0 else list_accuracy_test[i][-1]
     if tacc == "":
         tacc = {"" if len(list_accuracies_test[i])==0 else list_accuracies_test[i][-1]}
-    plt.title(f"{filenames[i]} -- Accuracy, Test Accuracy {tacc}")
+    plt.title(f"Accuracy, Test Accuracy {tacc}")
     plt.grid("minor")
-    plt.savefig(OUTPUT_DIR + "plots/" + f"{filenames[i]}_accuracy.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(OUTPUT_DIR + "plots/" + saveto + f"{filenames[i][:-4]}_accuracy.png", dpi=300, bbox_inches="tight")
     plt.close()

@@ -3,3 +3,4 @@ env312/
 .vscode/
 .idea/
 __pycache__/
+out/plots/
