@@ -8,7 +8,7 @@ from pathlib import Path
 from tqdm import tqdm
 import copy
 
-from data import VGDataset, plot_voxel_grid, find_small_scale_vgs, get_label_str
+from data import VGDataset, plot_voxel_grid, find_small_scale_vgs, get_label_str, modelnet40_label_to_idx
 from model import Classifier3D, AutoEncoder3D, Classifier3DWithEncoder
 
 # DATASET_PATH = "./data/ModelNet40/"
@@ -79,7 +79,7 @@ def load_model():
         load_filename = input("> ")
 
     checkpoint = torch.load(load_filename, weights_only=False)
-    model = Classifier3DWithEncoder()
+    model = Classifier3D()
     model.load_state_dict(checkpoint["model_state_dict"])
     losses_train = checkpoint["losses_train"]
     losses_val = checkpoint["losses_val"]
@@ -104,6 +104,12 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
     correct = 0
     total = 0
     losses_e = []
+
+    all_preds = []
+    all_labels = []
+    from torchmetrics import ConfusionMatrix
+    confmat = ConfusionMatrix(task="multiclass", num_classes=40).cuda()
+
     with torch.no_grad():
         model.eval()
         for inp, label in dataloader:
@@ -121,6 +127,9 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
             preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
             pred_classes = preds.argmax(dim=1)
             true_classes = label.argmax(dim=1)
+            if name=="test":
+                all_preds.append(pred_classes)
+                all_labels.append(true_classes)
             correct += (pred_classes == true_classes).sum().item()
             # out_binarized = (out >= 0.5).float()
             # correct += (out_binarized == label).sum().item() / (51*51*51)
@@ -134,6 +143,22 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
     accuracies.append(accuracy)
 
     print(f"{name} avg loss: {np.mean(losses_e)} (accuracy: {accuracies[-1]})")
+
+    if name == "test":
+        all_preds = torch.cat(all_preds)
+        all_labels = torch.cat(all_labels)
+
+        cm = confmat(all_preds, all_labels)
+        print(cm)
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        idx_to_label = {v: k for k, v in modelnet40_label_to_idx.items()}
+        label_names = [idx_to_label[i] for i in range(40)]
+        sns.heatmap(cm.cpu().numpy(), annot=True, fmt="d", cmap="Blues", xticklabels=label_names,  yticklabels=label_names)
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.show()
+
     return losses, accuracies
 
 # on CPU
@@ -426,8 +451,9 @@ def main():
     else:
         model = AutoEncoder3D()
 
-    opt = optim.NAdam(model.parameters(), lr=1e-3)
-    lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100, eta_min=1e-6)
+    opt = optim.NAdam(model.parameters(), lr=1e-3, betas=(0.9, 0.999), weight_decay=0.001)
+    # lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100, eta_min=1e-6)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt,mode='max',factor=0.5,patience=3)
 
     loss_criterion = None
     if args_autoencoder:
@@ -523,7 +549,7 @@ def main():
             losses_val.extend(lval)
             accuracies_val.extend(aval)
 
-            lr_scheduler.step()
+            lr_scheduler.step(np.mean(aval))
 
     accuracy_test = []
     _, accuracy_test = run_model_on_dataset(model, test_dataloader, loss_criterion, None, accuracy_test, device)
