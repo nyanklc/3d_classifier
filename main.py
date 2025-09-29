@@ -81,17 +81,21 @@ def load_model():
     checkpoint = torch.load(load_filename, weights_only=False)
     model = Classifier3D()
     model.load_state_dict(checkpoint["model_state_dict"])
-    losses_train = checkpoint["losses_train"]
-    losses_val = checkpoint["losses_val"]
-    accuracies_train = checkpoint["accuracies_train"]
-    accuracies_val = checkpoint["accuracies_val"]
-    accuracy_test = checkpoint["accuracy_test"]
     opt_state_dict = checkpoint["opt_state_dict"]
-    train_indices = checkpoint["train_indices"]
-    val_indices = checkpoint["val_indices"]
-    global BATCH_SIZE
-    BATCH_SIZE = checkpoint["BATCH_SIZE"]
-    print(f"set batch size: {BATCH_SIZE} because loaded model used it apparently")
+
+    # optional fields
+    losses_train = checkpoint.get("losses_train", [])
+    losses_val = checkpoint.get("losses_val", [])
+    accuracies_train = checkpoint.get("accuracies_train", [])
+    accuracies_val = checkpoint.get("accuracies_val", [])
+    accuracy_test = checkpoint.get("accuracy_test", [])
+    train_indices = checkpoint.get("train_indices", [])
+    val_indices = checkpoint.get("val_indices", [])
+
+    if "BATCH_SIZE" in checkpoint:
+        global BATCH_SIZE
+        BATCH_SIZE = checkpoint["BATCH_SIZE"]
+        print(f"set batch size: {BATCH_SIZE} because loaded model used it apparently")
 
     # print(f"loading losses_val len: {len(losses_val)} last one: {losses_val[-1]}")
     # print(f"loading accuracies_val len: {len(accuracies_val)} last one: {accuracies_val[-1]}")
@@ -104,6 +108,7 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
     correct = 0
     total = 0
     losses_e = []
+
 
     all_preds = []
     all_labels = []
@@ -118,7 +123,16 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
             # label = copy.deepcopy(inp).unsqueeze(1) # FOR AUTOENCODER
             label = label.to(device)
 
-            out = model(inp)
+            outs = []
+            rotations = [0, 1, 2, 3]
+            for rotation in rotations:
+                inp = rotate_3d_discrete(inp, rotation)
+                out = model(inp)
+                outs.append(out)
+            outs = torch.stack(outs, dim=0)
+            # out = outs.mean(dim=0)
+            out = outs.sum(dim=0)
+
             loss = loss_criterion(out, label)
             losses_e.append(loss.item())
 
@@ -316,6 +330,17 @@ def get_group(fname):
     # return "_".join(...)
     # TODO
     return None
+
+def rotate_3d_discrete(x, rotation):
+    import random
+    out = []
+    for b in range(x.size(0)):
+        cube = x[b]
+        axes = (0, 1)
+        rotated = torch.rot90(cube, k=rotation, dims=axes)
+        out.append(rotated)
+
+    return torch.stack(out, dim=0)
 
 def random_rotate_3d_discrete(x):
     import random
