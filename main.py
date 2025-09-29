@@ -103,7 +103,7 @@ def load_model():
     return model, losses_train, losses_val, accuracies_train, accuracies_val, accuracy_test, load_filename, opt_state_dict, train_indices, val_indices
 
 # TODO: i think python takes arrays as reference, so no need to return (may be causing extra copy operations idk).
-def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, device, name="test"):
+def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, device, name="test", last_epoch=False):
     accuracy = 0
     correct = 0
     total = 0
@@ -123,15 +123,17 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
             # label = copy.deepcopy(inp).unsqueeze(1) # FOR AUTOENCODER
             label = label.to(device)
 
-            outs = []
-            rotations = [0, 1, 2, 3]
-            for rotation in rotations:
-                inp = rotate_3d_discrete(inp, rotation)
-                out = model(inp)
-                outs.append(out)
-            outs = torch.stack(outs, dim=0)
-            # out = outs.mean(dim=0)
-            out = outs.sum(dim=0)
+            # outs = []
+            # rotations = [0, 1, 2, 3]
+            # for rotation in rotations:
+            #     inp = rotate_3d_discrete(inp, rotation)
+            #     out = model(inp)
+            #     outs.append(out)
+            # outs = torch.stack(outs, dim=0)
+            # # out = outs.mean(dim=0)
+            # out = outs.sum(dim=0)
+
+            out = model(inp)
 
             loss = loss_criterion(out, label)
             losses_e.append(loss.item())
@@ -141,7 +143,7 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
             preds[torch.arange(out.size(0)), out.argmax(dim=1)] = 1
             pred_classes = preds.argmax(dim=1)
             true_classes = label.argmax(dim=1)
-            if name=="test":
+            if name=="test" or last_epoch:
                 all_preds.append(pred_classes)
                 all_labels.append(true_classes)
             correct += (pred_classes == true_classes).sum().item()
@@ -158,7 +160,7 @@ def run_model_on_dataset(model, dataloader, loss_criterion, losses, accuracies, 
 
     print(f"{name} avg loss: {np.mean(losses_e)} (accuracy: {accuracies[-1]})")
 
-    if name == "test":
+    if name=="test" or last_epoch:
         all_preds = torch.cat(all_preds)
         all_labels = torch.cat(all_labels)
 
@@ -476,7 +478,7 @@ def main():
     else:
         model = AutoEncoder3D()
 
-    opt = optim.NAdam(model.parameters(), lr=1e-3, betas=(0.9, 0.999), weight_decay=0.001)
+    opt = optim.Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.999), weight_decay=0.001)
     # lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=100, eta_min=1e-6)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt,mode='max',factor=0.5,patience=3)
 
@@ -512,7 +514,7 @@ def main():
 
     # train
     if args_train_model:
-        highest_acc_train = 0.0
+        highest_acc_val = 0.0
         epochs = NR_EPOCHS
         for epoch in range(epochs):
             correct = 0
@@ -528,7 +530,7 @@ def main():
                 label = label.to(device)
 
                 # random rotation
-                inp = random_rotate_3d_discrete(inp)
+                # inp = random_rotate_3d_discrete(inp)
 
                 out = model(inp)
 
@@ -554,15 +556,6 @@ def main():
 
             accuracy = correct / total
 
-            if accuracy > highest_acc_train:
-                highest_acc_train = accuracy
-                torch.save({
-                    "model_state_dict": model.state_dict(),
-                    "opt_state_dict": opt.state_dict(),
-                    "BATCH_SIZE": BATCH_SIZE,
-                    "train_indices": train_indices,
-                    "val_indices": val_indices,
-                }, OUTPUT_DIR + "out.pth")
 
             losses_train.extend(losses_train_e)
             accuracies_train.append(accuracy)
@@ -570,9 +563,19 @@ def main():
 
             #  validation
             lval, aval = [], []
-            lval, aval = run_model_on_dataset(model, val_dataloader, loss_criterion, lval, aval, device, "validation")
+            lval, aval = run_model_on_dataset(model, val_dataloader, loss_criterion, lval, aval, device, "validation", last_epoch=(epoch==NR_EPOCHS-1))
             losses_val.extend(lval)
             accuracies_val.extend(aval)
+
+            if np.mean(aval) > highest_acc_val:
+                highest_acc_val = np.mean(aval)
+                torch.save({
+                    "model_state_dict": model.state_dict(),
+                    "opt_state_dict": opt.state_dict(),
+                    "BATCH_SIZE": BATCH_SIZE,
+                    "train_indices": train_indices,
+                    "val_indices": val_indices,
+                }, OUTPUT_DIR + "out.pth")
 
             lr_scheduler.step(np.mean(aval))
 

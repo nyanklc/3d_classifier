@@ -182,6 +182,42 @@ class Classifier3D(nn.Module):
         #     nn.Linear(in_features=128, out_features=40)
         # )
 
+# ############ 51 ###############
+#         self.feature_extractor_3d = nn.Sequential(
+#             # nn.Dropout(0.2),
+#             nn.Conv3d(in_channels=1, out_channels=40, kernel_size=3, stride=2), # 40 * 25
+#             nn.BatchNorm3d(40),
+#             nn.LeakyReLU(),
+#             nn.Conv3d(in_channels=40, out_channels=80, kernel_size=3, stride=1), # 80 * 23
+#             nn.BatchNorm3d(80),
+#             nn.LeakyReLU(),
+#             nn.MaxPool3d(2), # 80 * 11
+#             nn.Conv3d(in_channels=80, out_channels=128, kernel_size=3, stride=1), # 128 * 9
+#             nn.BatchNorm3d(128),
+#             nn.LeakyReLU(),
+#         )
+#         self.feature_extractor_2d = nn.Sequential(
+#             # nn.Dropout(0.2),
+#             nn.Conv2d(in_channels=1, out_channels=40, kernel_size=3, stride=2), # 40 * 25
+#             nn.BatchNorm2d(40),
+#             nn.LeakyReLU(),
+#             nn.Conv2d(in_channels=40, out_channels=80, kernel_size=3, stride=1), # 80 * 23
+#             nn.BatchNorm2d(80),
+#             nn.LeakyReLU(),
+#             nn.MaxPool2d(2), # 80 * 11
+#             nn.Conv2d(in_channels=80, out_channels=128, kernel_size=3, stride=1), # 128 * 9
+#             nn.BatchNorm2d(128),
+#             nn.LeakyReLU(),
+#         )
+#         self.classifier = nn.Sequential(
+#             nn.Linear(in_features=124416, out_features=128),
+#             nn.Dropout(),
+#             nn.LeakyReLU(),
+#             nn.Linear(in_features=128, out_features=40)
+#         )
+# ############ 51 ###############
+
+########### 33 ###############
         self.feature_extractor_3d = nn.Sequential(
             # nn.Dropout(0.2),
             nn.Conv3d(in_channels=1, out_channels=40, kernel_size=3, stride=2), # 40 * 16
@@ -214,6 +250,7 @@ class Classifier3D(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(in_features=128, out_features=40)
         )
+########### 33 ###############
 
         # self.net = nn.Sequential(
         #     nn.Conv3d(in_channels=1, out_channels=40, kernel_size=5), # 6 * 29

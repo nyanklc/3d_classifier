@@ -275,6 +275,8 @@ def label_id_to_np(label_id):
     t[label_id] = 1
     return t
 
+# class VGDataset
+
 # type either "train" or "test"
 class VGDataset(Dataset):
 
