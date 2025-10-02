@@ -1,5 +1,9 @@
 ﻿# 3d_classifier
 
+[![PDF Preview](mcnn_conv_first_page.png)](mcnn_conv.pdf)
+[![PDF Preview](mcnn_conv_architecture.png)](mcnn_conv.pdf)
+
+
 ## Requirements
 - Python 3.12
 - Pytorch cu126 (Cuda 12.6)
@@ -9,5 +13,3 @@
 - tqdm
 - torchmetrics
 - seaborn
-
-<object data="mcnn_conv.pdf" width="1000" height="1000" type='application/pdf'></object>
